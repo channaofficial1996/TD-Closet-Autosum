@@ -3,12 +3,11 @@ from datetime import datetime, timedelta
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-ABA_BOT_ID = 1236061511   # PayWay by ABA Bot (official)
 ROOT_REPORT = "reports"
 DATA_FILE = "all_transactions.json"
 BOT_TOKEN = "7601064850:AAFdcLzg0jiXIDlHdwZIUsHzOB-6EirkSUY"
+ABA_BOT_ID = 1236061511   # ប្រាកដជាត្រូវតែមើល Debug
 
-# Auto create report folders
 for sub in ["daily", "weekly", "monthly", "yearly"]:
     os.makedirs(os.path.join(ROOT_REPORT, sub), exist_ok=True)
 
@@ -87,9 +86,12 @@ def parse_aba_transaction(text):
         })
     return transactions
 
+# ---- DEBUG: Show User ID & Name (only enable 1st time for ABA Bot ID!) ----
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
+    name = update.message.from_user.full_name
     text = update.message.text
+    # ABA Bot Only
     if user_id == ABA_BOT_ID:
         txns = parse_aba_transaction(text)
         append_and_save_reports(txns)
@@ -105,7 +107,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             msg = "✅ រក្សាទុកសារបានជោគជ័យ (មិនមាន $ ឬ ៛)"
         await update.message.reply_text(msg)
-    # else: Ignore other messages (not from ABA bot)
+    # ---- (Uncomment for debug, to see User ID of sender) ----
+    # await update.message.reply_text(f"User ID: {user_id}\nName: {name}")
 
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     btns = [
