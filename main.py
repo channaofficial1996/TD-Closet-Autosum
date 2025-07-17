@@ -22,34 +22,57 @@ def parse_aba_transaction(text):
     khr_matches = re.findall(r'៛\s?([0-9,]+)', text)
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     transactions = []
+    detected = False
     for usd in usd_matches:
         amt = float(usd.replace(',', ''))
-        transactions.append({"currency": "USD", "amount": amt, "text": text, "datetime": now})
+        transactions.append({
+            "currency": "USD",
+            "amount": amt,
+            "text": text,
+            "datetime": now,
+            "detected": True
+        })
+        detected = True
     for khr in khr_matches:
         amt = int(khr.replace(',', ''))
-        transactions.append({"currency": "KHR", "amount": amt, "text": text, "datetime": now})
-    return transactions if transactions else None
+        transactions.append({
+            "currency": "KHR",
+            "amount": amt,
+            "text": text,
+            "datetime": now,
+            "detected": True
+        })
+        detected = True
+    if not detected:
+        transactions.append({
+            "currency": None,
+            "amount": None,
+            "text": text,
+            "datetime": now,
+            "detected": False
+        })
+    return transactions
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     txns = parse_aba_transaction(text)
-    # Debug log: show what bot sees
-    await update.message.reply_text(f"DEBUG: {text}")
-    if txns:
-        data = load_data()
-        count_usd = sum(1 for txn in txns if txn["currency"] == "USD")
-        count_khr = sum(1 for txn in txns if txn["currency"] == "KHR")
-        for txn in txns:
-            data.append(txn)
-        save_data(data)
-        msgs = []
-        if count_usd > 0:
-            msgs.append(f"✅ ចាប់បាន USD {count_usd} ដង")
-        if count_khr > 0:
-            msgs.append(f"✅ ចាប់បាន KHR {count_khr} ដង")
-        await update.message.reply_text('\n'.join(msgs))
+    data = load_data()
+    msg = ""
+    new_usd = sum(1 for txn in txns if txn.get("currency") == "USD")
+    new_khr = sum(1 for txn in txns if txn.get("currency") == "KHR")
+    for txn in txns:
+        data.append(txn)
+    save_data(data)
+    if new_usd or new_khr:
+        tmp = []
+        if new_usd:
+            tmp.append(f"✅ ចាប់បាន USD {new_usd} ដង")
+        if new_khr:
+            tmp.append(f"✅ ចាប់បាន KHR {new_khr} ដង")
+        msg = "\n".join(tmp)
     else:
-        await update.message.reply_text("❌ មិនរកឃើញទឹកប្រាក់ $ ឬ ៛ ក្នុងសារ។")
+        msg = "✅ រក្សាទុកសារបានជោគជ័យ (មិនមាន $ ឬ ៛)"
+    await update.message.reply_text(msg)
 
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     btns = [
@@ -94,8 +117,8 @@ async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if typ:
         start, end = get_range(typ, now)
-        usd_list = [x for x in data if x["currency"]=="USD" and start <= datetime.strptime(x["datetime"], "%Y-%m-%d %H:%M") <= end]
-        khr_list = [x for x in data if x["currency"]=="KHR" and start <= datetime.strptime(x["datetime"], "%Y-%m-%d %H:%M") <= end]
+        usd_list = [x for x in data if x.get("currency")=="USD" and x.get("detected") and start <= datetime.strptime(x["datetime"], "%Y-%m-%d %H:%M") <= end]
+        khr_list = [x for x in data if x.get("currency")=="KHR" and x.get("detected") and start <= datetime.strptime(x["datetime"], "%Y-%m-%d %H:%M") <= end]
         usd = sum(float(x["amount"]) for x in usd_list)
         khr = sum(int(x["amount"]) for x in khr_list)
         start_str = format_date(start)
