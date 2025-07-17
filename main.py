@@ -5,7 +5,9 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 DATA_FILE = "transactions.json"
-TOKEN = os.getenv("7601064850:AAFdcLzg0jiXIDlHdwZIUsHzOB-6EirkSUY")  # អ្នកបញ្ចូល Bot Token របស់អ្នកនៅ Railway
+# FIX HERE:
+TOKEN = "7601064850:AAFdcLzg0jiXIDlHdwZIUsHzOB-6EirkSUY"
+# ឬប្រើ TOKEN = os.getenv("BOT_TOKEN")
 
 def load_data():
     if not os.path.exists(DATA_FILE):
@@ -17,7 +19,6 @@ def save_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
-# បញ្ជីប៊ូតុងជាភាសាខ្មែរ
 main_menu = ReplyKeyboardMarkup([
     ["ប្រចាំថ្ងៃ", "ប្រចាំសប្ដាហ៍"],
     ["ប្រចាំខែ"]
@@ -29,10 +30,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=main_menu
     )
 
-# Example Transaction Add (អ្នកអាចសម្រួលបន្ថែម logic)
 async def add_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message.text
-    # Format:  KHR:50000   or  USD:5
     if "KHR" in msg:
         currency = "KHR"
         amount = int(msg.replace("KHR:", "").strip())
@@ -51,7 +50,6 @@ async def add_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_data(data)
     await update.message.reply_text("បានកត់ត្រា")
 
-# សរុបតាមថ្ងៃ
 async def report_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
     today = datetime.now().strftime("%Y-%m-%d")
