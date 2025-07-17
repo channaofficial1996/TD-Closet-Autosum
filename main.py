@@ -1,139 +1,74 @@
-import re, json
-from datetime import datetime, timedelta
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+import os
+import json
+from datetime import datetime
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 DATA_FILE = "transactions.json"
-BOT_TOKEN = "7601064850:AAFdcLzg0jiXIDlHdwZIUsHzOB-6EirkSUY"
+TOKEN = os.getenv("7601064850:AAFdcLzg0jiXIDlHdwZIUsHzOB-6EirkSUY")  # អ្នកបញ្ចូល Bot Token របស់អ្នកនៅ Railway
 
 def load_data():
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
+    if not os.path.exists(DATA_FILE):
         return []
+    with open(DATA_FILE, "r") as f:
+        return json.load(f)
 
 def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f, indent=2)
 
-def parse_aba_transaction(text):
-    usd_matches = re.findall(r'\$([0-9,]+\.\d{2})', text)
-    khr_matches = re.findall(r'៛\s?([0-9,]+)', text)
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    transactions = []
-    detected = False
-    for usd in usd_matches:
-        amt = float(usd.replace(',', ''))
-        transactions.append({
-            "currency": "USD",
-            "amount": amt,
-            "text": text,
-            "datetime": now,
-            "detected": True
-        })
-        detected = True
-    for khr in khr_matches:
-        amt = int(khr.replace(',', ''))
-        transactions.append({
-            "currency": "KHR",
-            "amount": amt,
-            "text": text,
-            "datetime": now,
-            "detected": True
-        })
-        detected = True
-    if not detected:
-        transactions.append({
-            "currency": None,
-            "amount": None,
-            "text": text,
-            "datetime": now,
-            "detected": False
-        })
-    return transactions
+# បញ្ជីប៊ូតុងជាភាសាខ្មែរ
+main_menu = ReplyKeyboardMarkup([
+    ["ប្រចាំថ្ងៃ", "ប្រចាំសប្ដាហ៍"],
+    ["ប្រចាំខែ"]
+], resize_keyboard=True)
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    txns = parse_aba_transaction(text)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "សូមជ្រើសរើសសកម្មភាព៖",
+        reply_markup=main_menu
+    )
+
+# Example Transaction Add (អ្នកអាចសម្រួលបន្ថែម logic)
+async def add_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message.text
+    # Format:  KHR:50000   or  USD:5
+    if "KHR" in msg:
+        currency = "KHR"
+        amount = int(msg.replace("KHR:", "").strip())
+    elif "USD" in msg:
+        currency = "USD"
+        amount = float(msg.replace("USD:", "").strip())
+    else:
+        await update.message.reply_text("បញ្ចូលទ្រង់ទ្រាយ KHR:50000 ឬ USD:5")
+        return
     data = load_data()
-    msg = ""
-    new_usd = sum(1 for txn in txns if txn.get("currency") == "USD")
-    new_khr = sum(1 for txn in txns if txn.get("currency") == "KHR")
-    for txn in txns:
-        data.append(txn)
+    data.append({
+        "amount": amount,
+        "currency": currency,
+        "date": datetime.now().strftime("%Y-%m-%d")
+    })
     save_data(data)
-    if new_usd or new_khr:
-        tmp = []
-        if new_usd:
-            tmp.append(f"✅ ចាប់បាន USD {new_usd} ដង")
-        if new_khr:
-            tmp.append(f"✅ ចាប់បាន KHR {new_khr} ដង")
-        msg = "\n".join(tmp)
-    else:
-        msg = "✅ រក្សាទុកសារបានជោគជ័យ (មិនមាន $ ឬ ៛)"
-    await update.message.reply_text(msg)
+    await update.message.reply_text("បានកត់ត្រា")
 
-async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    btns = [
-        [KeyboardButton("📆 ប្រចាំថ្ងៃ"), KeyboardButton("📅 ប្រចាំសប្ដាហ៍")],
-        [KeyboardButton("🗓️ ប្រចាំខែ"), KeyboardButton("📈 ប្រចាំឆ្នាំ")],
-    ]
-    markup = ReplyKeyboardMarkup(btns, resize_keyboard=True)
-    await update.message.reply_text("📊 សូមជ្រើសរើសរបាយការណ៍:", reply_markup=markup)
-
-def get_range(type_, now):
-    if type_ == "daily":
-        start = now.replace(hour=0, minute=0)
-        end = now.replace(hour=23, minute=59)
-    elif type_ == "weekly":
-        start = now - timedelta(days=now.weekday())
-        end = start + timedelta(days=6, hours=23, minutes=59)
-    elif type_ == "monthly":
-        start = now.replace(day=1, hour=0, minute=0)
-        end = now.replace(hour=23, minute=59)
-    elif type_ == "yearly":
-        start = now.replace(month=1, day=1, hour=0, minute=0)
-        end = now.replace(hour=23, minute=59)
-    return start, end
-
-def format_date(dt):
-    return dt.strftime("%d %b %Y")
-
-async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# សរុបតាមថ្ងៃ
+async def report_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
-    now = datetime.now()
-    txt = update.message.text
-    if txt == "📆 ប្រចាំថ្ងៃ":
-        typ = "daily"
-    elif txt == "📅 ប្រចាំសប្ដាហ៍":
-        typ = "weekly"
-    elif txt == "🗓️ ប្រចាំខែ":
-        typ = "monthly"
-    elif txt == "📈 ប្រចាំឆ្នាំ":
-        typ = "yearly"
-    else:
-        typ = None
+    today = datetime.now().strftime("%Y-%m-%d")
+    khr_total = sum(d["amount"] for d in data if d["currency"] == "KHR" and d["date"] == today)
+    usd_total = sum(d["amount"] for d in data if d["currency"] == "USD" and d["date"] == today)
+    khr_count = sum(1 for d in data if d["currency"] == "KHR" and d["date"] == today)
+    usd_count = sum(1 for d in data if d["currency"] == "USD" and d["date"] == today)
+    text = (
+        f"សរុបប្រតិបត្តិការ ថ្ងៃទី {today}:\n"
+        f"៛ (KHR): {khr_total:,} ចំនួនប្រតិបត្តិការសរុប: {khr_count}\n"
+        f"$ (USD): {usd_total:.2f} ចំនួនប្រតិបត្តិការសរុប: {usd_count}"
+    )
+    await update.message.reply_text(text)
 
-    if typ:
-        start, end = get_range(typ, now)
-        usd_list = [x for x in data if x.get("currency")=="USD" and x.get("detected") and start <= datetime.strptime(x["datetime"], "%Y-%m-%d %H:%M") <= end]
-        khr_list = [x for x in data if x.get("currency")=="KHR" and x.get("detected") and start <= datetime.strptime(x["datetime"], "%Y-%m-%d %H:%M") <= end]
-        usd = sum(float(x["amount"]) for x in usd_list)
-        khr = sum(int(x["amount"]) for x in khr_list)
-        start_str = format_date(start)
-        end_str = format_date(end)
-        msg = (
-            f"📊 Summary from {start_str} → {end_str}\n"
-            f"💵 USD: ${usd:.2f} ({len(usd_list)} transactions)\n"
-            f"🇰🇭 KHR: ៛{khr:,} ({len(khr_list)} transactions)"
-        )
-    else:
-        msg = "❓ មិនដឹងប៊ូតុងនេះទេ។ សូមចុច /report ដើម្បីមើលប៊ូតុង!"
-    await update.message.reply_text(msg)
+app = ApplicationBuilder().token(TOKEN).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.Regex("^ប្រចាំថ្ងៃ$"), report_daily))
+app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), add_transaction))
 
-app = ApplicationBuilder().token(BOT_TOKEN).build()
-app.add_handler(CommandHandler("report", report))
-app.add_handler(MessageHandler(filters.Regex(r"^(📆 ប្រចាំថ្ងៃ|📅 ប្រចាំសប្ដាហ៍|🗓️ ប្រចាំខែ|📈 ប្រចាំឆ្នាំ)$"), handle_button))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 app.run_polling()
