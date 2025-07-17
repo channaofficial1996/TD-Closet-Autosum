@@ -108,7 +108,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ["/monthly", "/yearly"],
         ["/range 2025-07-01 2025-07-17"]
     ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    reply_markup = ReplyKeyboardMarkup(
+        keyboard,
+        resize_keyboard=True,
+        is_persistent=True,
+        input_field_placeholder="Choose a report"
+    )
     await update.message.reply_text(
         "👋 Welcome! Choose a report below or type /range <start> <end>",
         reply_markup=reply_markup
