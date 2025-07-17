@@ -34,14 +34,14 @@ async def add_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
     currency = None
     amount = None
 
-    # --- ABA/PayWay system message detection ---
+    # ABA/PayWay message: $10.00 paid by ...
     match_usd = re.search(r"\$(\d+(?:\.\d{1,2})?)\s*paid by", msg)
     if match_usd:
         currency = "USD"
         amount = float(match_usd.group(1))
-    # --- KHR system detection can be added here if available ---
+    # KHR ABA/PayWay? (If you have a clear format, add it here)
 
-    # Manual fallback (optional)
+    # Manual KHR:50000 or USD:5
     elif "KHR:" in msg:
         currency = "KHR"
         try:
@@ -63,10 +63,9 @@ async def add_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "date": datetime.now().strftime("%Y-%m-%d")
         })
         save_data(data)
-        # Optional: Do not send "បានកត់ត្រា" for system messages, or show only for manual.
-        # await update.message.reply_text("បានកត់ត្រា")
-    # else:
-        # await update.message.reply_text("បញ្ចូលទ្រង់ទ្រាយ KHR:50000 ឬ USD:5 ឬ paste ABA/PayWay message")
+        await update.message.reply_text("បានកត់ត្រា")
+    else:
+        await update.message.reply_text("បញ្ចូលទ្រង់ទ្រាយ KHR:50000 ឬ USD:5 ឬ paste ABA/PayWay message")
 
 async def report_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
@@ -85,7 +84,6 @@ async def report_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.Regex("^ប្រចាំថ្ងៃ$"), report_daily))
-# **IMPORTANT:** Use filters.ALL to catch all group messages!
 app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), add_transaction))
 
 app.run_polling()
