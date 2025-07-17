@@ -10,40 +10,51 @@ BOT_TOKEN = "7601064850:AAFdcLzg0jiXIDlHdwZIUsHzOB-6EirkSUY"
 
 def load_data():
     try:
-        with open(DATA_FILE, "r") as f:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except:
         return []
 
 def save_data(data):
-    with open(DATA_FILE, "w") as f:
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 def parse_aba_transaction(text):
-    m_usd = re.search(r'\$([0-9,]+\.\d{2})', text)
-    m_khr = re.search(r'៛\s?([0-9,]+)', text)
+    # Find all USD ($xx.xx) and KHR (៛xx,xxx) amounts in text
+    usd_matches = re.findall(r'\$([0-9,]+\.\d{2})', text)
+    khr_matches = re.findall(r'៛\s?([0-9,]+)', text)
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    if m_usd:
-        amt = float(m_usd.group(1).replace(',', ''))
-        return {"currency": "USD", "amount": amt, "text": text, "datetime": now}
-    if m_khr:
-        amt = int(m_khr.group(1).replace(',', ''))
-        return {"currency": "KHR", "amount": amt, "text": text, "datetime": now}
-    return None
+    transactions = []
+    for usd in usd_matches:
+        amt = float(usd.replace(',', ''))
+        transactions.append({"currency": "USD", "amount": amt, "text": text, "datetime": now})
+    for khr in khr_matches:
+        amt = int(khr.replace(',', ''))
+        transactions.append({"currency": "KHR", "amount": amt, "text": text, "datetime": now})
+    return transactions if transactions else None
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    txn = parse_aba_transaction(text)
-    if txn:
+    txns = parse_aba_transaction(text)
+    if txns:
         data = load_data()
-        data.append(txn)
+        count_usd = 0
+        count_khr = 0
+        for txn in txns:
+            data.append(txn)
+            if txn["currency"] == "USD":
+                count_usd += 1
+            else:
+                count_khr += 1
         save_data(data)
-        if txn["currency"] == "USD":
-            await update.message.reply_text(f"✅ បញ្ចូលប្រាក់ចូល: ${txn['amount']:.2f}")
-        else:
-            await update.message.reply_text(f"✅ បញ្ចូលប្រាក់ចូល: ៛{txn['amount']:,}")
+        msgs = []
+        if count_usd > 0:
+            msgs.append(f"✅ ចាប់បាន USD {count_usd} ដង")
+        if count_khr > 0:
+            msgs.append(f"✅ ចាប់បាន KHR {count_khr} ដង")
+        await update.message.reply_text('\n'.join(msgs))
     else:
-        await update.message.reply_text("❌ មិនមានទឹកប្រាក់ ($ ឬ ៛) ក្នុងសារ។")
+        await update.message.reply_text("❌ មិនរកឃើញទឹកប្រាក់ $ ឬ ៛ ក្នុងសារ។")
 
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     btns = [
