@@ -1,3 +1,4 @@
+
 import os
 import re
 import json
@@ -108,19 +109,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ["/monthly", "/yearly"],
         ["/range 2025-07-01 2025-07-17"]
     ]
-    reply_markup = ReplyKeyboardMarkup(
-        keyboard,
-        resize_keyboard=True,
-        is_persistent=True,
-        input_field_placeholder="Choose a report"
-    )
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text(
         "👋 Welcome! Choose a report below or type /range <start> <end>",
         reply_markup=reply_markup
     )
 
 if __name__ == '__main__':
-    BOT_TOKEN = "7601064850:AAFdcLzg0jiXIDlHdwZIUsHzOB-6EirkSUY"
+    BOT_TOKEN = os.getenv("BOT_TOKEN")
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
