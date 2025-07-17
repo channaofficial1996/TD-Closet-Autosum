@@ -1,9 +1,7 @@
-import os, re, json
+import re, json
 from datetime import datetime, timedelta
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 DATA_FILE = "transactions.json"
 BOT_TOKEN = "7601064850:AAFdcLzg0jiXIDlHdwZIUsHzOB-6EirkSUY"
@@ -20,7 +18,6 @@ def save_data(data):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 def parse_aba_transaction(text):
-    # Find all USD ($xx.xx) and KHR (៛xx,xxx) amounts in text
     usd_matches = re.findall(r'\$([0-9,]+\.\d{2})', text)
     khr_matches = re.findall(r'៛\s?([0-9,]+)', text)
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -36,16 +33,14 @@ def parse_aba_transaction(text):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     txns = parse_aba_transaction(text)
+    # Debug log: show what bot sees
+    await update.message.reply_text(f"DEBUG: {text}")
     if txns:
         data = load_data()
-        count_usd = 0
-        count_khr = 0
+        count_usd = sum(1 for txn in txns if txn["currency"] == "USD")
+        count_khr = sum(1 for txn in txns if txn["currency"] == "KHR")
         for txn in txns:
             data.append(txn)
-            if txn["currency"] == "USD":
-                count_usd += 1
-            else:
-                count_khr += 1
         save_data(data)
         msgs = []
         if count_usd > 0:
