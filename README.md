@@ -1,10 +1,10 @@
-# Telegram ABA Transaction Bot
+# Telegram ABA Transaction Bot (Standalone Version)
 
 ✅ Tracks ABA payment messages and supports both USD ($) and KHR (៛)  
 📊 Shows total amount and transaction counts  
 📆 Supports /daily, /weekly, /monthly, /yearly, and custom /range  
 🗓 Weekly/monthly/yearly show date range  
-🚀 Deploy-ready for Railway
+🚀 Ready to run locally or on any Python server
 
 ### Commands:
 - /daily
@@ -15,7 +15,7 @@
 
 ### Example:
 ```
-/range 2025-07-01 2025-07-15
+/range 2025-07-01 2025-07-17
 ```
 
 ### Message Format:
