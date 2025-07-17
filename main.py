@@ -1,13 +1,12 @@
 import os
 import json
+import re
 from datetime import datetime
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 DATA_FILE = "transactions.json"
-# FIX HERE:
 TOKEN = "7601064850:AAFdcLzg0jiXIDlHdwZIUsHzOB-6EirkSUY"
-# ឬប្រើ TOKEN = os.getenv("BOT_TOKEN")
 
 def load_data():
     if not os.path.exists(DATA_FILE):
@@ -31,24 +30,42 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def add_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message.text
-    if "KHR" in msg:
-        currency = "KHR"
-        amount = int(msg.replace("KHR:", "").strip())
-    elif "USD" in msg:
+    msg = update.message.text.strip()
+    currency = None
+    amount = None
+
+    # ABA/PayWay message: $10.00 paid by ...
+    match_usd = re.search(r"\$(\d+(?:\.\d{1,2})?)\s*paid by", msg)
+    if match_usd:
         currency = "USD"
-        amount = float(msg.replace("USD:", "").strip())
+        amount = float(match_usd.group(1))
+    # KHR ABA/PayWay? (If you have a clear format, add it here)
+
+    # Manual KHR:50000 or USD:5
+    elif "KHR:" in msg:
+        currency = "KHR"
+        try:
+            amount = int(msg.replace("KHR:", "").strip().replace(",", ""))
+        except Exception:
+            pass
+    elif "USD:" in msg:
+        currency = "USD"
+        try:
+            amount = float(msg.replace("USD:", "").strip().replace(",", ""))
+        except Exception:
+            pass
+
+    if currency is not None and amount is not None:
+        data = load_data()
+        data.append({
+            "amount": amount,
+            "currency": currency,
+            "date": datetime.now().strftime("%Y-%m-%d")
+        })
+        save_data(data)
+        await update.message.reply_text("បានកត់ត្រា")
     else:
-        await update.message.reply_text("បញ្ចូលទ្រង់ទ្រាយ KHR:50000 ឬ USD:5")
-        return
-    data = load_data()
-    data.append({
-        "amount": amount,
-        "currency": currency,
-        "date": datetime.now().strftime("%Y-%m-%d")
-    })
-    save_data(data)
-    await update.message.reply_text("បានកត់ត្រា")
+        await update.message.reply_text("បញ្ចូលទ្រង់ទ្រាយ KHR:50000 ឬ USD:5 ឬ paste ABA/PayWay message")
 
 async def report_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
